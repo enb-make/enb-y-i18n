@@ -88,8 +88,10 @@ module.exports = require('enb/lib/build-flow').create()
                 res.push('    });');
                 res.push('} else if (typeof module !== \'undefined\') {');
                 res.push('    module.exports = function() {return initKeyset();};');
-                res.push('} else {');
+                res.push('} else if (typeof window !== \'undefined\') {');
                 res.push('    window.i18n = initKeyset();');
+                res.push('} else {');
+                res.push('    i18n = initKeyset();');
                 res.push('}');
                 res.push('})();');
                 return res.join('\n');
