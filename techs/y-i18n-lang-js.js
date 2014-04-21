@@ -20,7 +20,7 @@
  * ]);
  * ```
  */
-var vowFs = require('vow-fs');
+var vowFs = require('enb/lib/fs/async-fs');
 var CompactTL = require('compact-tl').CompactTL;
 var yI18NLayer = require('../lib/y-i18n-layer');
 
