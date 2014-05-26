@@ -2,7 +2,7 @@
  * y-i18n-lang-js
  * ==============
  *
- * Собирает `?.lang.<язык>.js`-файлы на основе `?.keysets.<язык>.js`-файлов.
+ * Собирает `?.lang.<язык>.js`-файлы на основе `i18n`-файлов.
  *
  * Используется для локализации в JS с помощью compact-tl + y-i18n-layer.
  *
@@ -15,12 +15,15 @@
  *
  * ```javascript
  * nodeConfig.addTechs([
- *   [ require('enb-y-i18n/techs/y-i18n-lang-js'), { lang: 'all'} ],
- *   [ require('enb-y-i18n/techs/y-i18n-lang-js'), { lang: '{lang}'} ],
+ *   [require('enb-y-i18n/techs/y-i18n-lang-js'), {lang: '{lang}'}],
  * ]);
  * ```
  */
+var path = require('path');
+var vow = require('vow');
 var vowFs = require('enb/lib/fs/async-fs');
+var asyncRequire = require('enb/lib/fs/async-require');
+var dropRequireCache = require('enb/lib/fs/drop-require-cache');
 var CompactTL = require('compact-tl').CompactTL;
 var yI18NLayer = require('../lib/y-i18n-layer');
 
@@ -29,23 +32,24 @@ module.exports = require('enb/lib/build-flow').create()
     .target('target', '?.lang.{lang}.js')
     .defineOption('i18nFile', '')
     .defineRequiredOption('lang')
-    .useSourceFilename('keysetsTarget', '?.keysets.{lang}.js')
+    .useDirList('i18n')
     .needRebuild(function(cache) {
-        this._i18nFile = this._i18nFile || __dirname + '/../client/y-i18n.js';
+        this._i18nFile = this._i18nFile || path.resolve(__dirname, '../client/y-i18n.js');
         return cache.needRebuildFile('i18n-file', this._i18nFile);
     })
     .saveCache(function(cache) {
         cache.cacheFileInfo('i18n-file', this._i18nFile);
     })
-    .builder(function(keysetsFilename) {
+    .builder(function(langKeysetDirs) {
+        var lang = this._lang;
         var compactTl = new CompactTL();
         compactTl.use(yI18NLayer.create());
         this._i18nClassData = '';
-        return vowFs.read(this._i18nFile, 'utf8').then(function (i18nClassData) {
+        return vow.all([
+            vowFs.read(this._i18nFile, 'utf8'),
+            mergeKeysets(lang, langKeysetDirs)
+        ]).spread(function (i18nClassData, keysets) {
             this._i18nClassData = i18nClassData;
-            delete require.cache[keysetsFilename];
-            var keysets = require(keysetsFilename);
-            var lang = this._lang;
             var result = [];
             Object.keys(keysets).sort().forEach(function(keysetName) {
                 var keyset = keysets[keysetName];
@@ -101,3 +105,28 @@ module.exports = require('enb/lib/build-flow').create()
         }
     })
     .createTech();
+
+function mergeKeysets(lang, keysetDirs) {
+    var langJs = lang + '.js';
+    var langKeysetFiles = [].concat.apply([], keysetDirs.map(function (dir) {
+        return dir.files;
+    })).filter(function (fileInfo) {
+        return fileInfo.name === langJs;
+    });
+
+    var result = {};
+    return vow.all(langKeysetFiles.map(function (keysetFile) {
+        dropRequireCache(keysetFile.fullname);
+        return asyncRequire(keysetFile.fullname).then(function (keysets) {
+            Object.keys(keysets).forEach(function (keysetName) {
+                var keyset = keysets[keysetName];
+                result[keysetName] = (result[keysetName] || {});
+                Object.keys(keyset).forEach(function (keyName) {
+                    result[keysetName][keyName] = keyset[keyName];
+                });
+            });
+        });
+    })).then(function () {
+        return result;
+    });
+}
