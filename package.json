@@ -1,6 +1,6 @@
 {
   "name": "enb-y-i18n",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "scripts": {
     "test": "npm run-script jshint && npm run-script check-style && npm run-script unit-tests",
