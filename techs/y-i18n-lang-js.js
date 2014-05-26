@@ -116,7 +116,7 @@ function mergeKeysets(lang, keysetDirs) {
 
     var result = {};
     return vow.all(langKeysetFiles.map(function (keysetFile) {
-        dropRequireCache(keysetFile.fullname);
+        dropRequireCache(require, keysetFile.fullname);
         return asyncRequire(keysetFile.fullname).then(function (keysets) {
             Object.keys(keysets).forEach(function (keysetName) {
                 var keyset = keysets[keysetName];
